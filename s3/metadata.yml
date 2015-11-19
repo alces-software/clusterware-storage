@@ -1,4 +1,4 @@
 ---
 install:
   _: |
-    :
+    alces service install s3cmd
