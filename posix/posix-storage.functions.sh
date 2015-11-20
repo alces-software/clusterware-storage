@@ -20,7 +20,7 @@
 # https://github.com/alces-software/clusterware
 #==============================================================================
 posix_storage_configure() {
-    local name path system
+    local name path system data datafile
     if [ "$1" == "--system" ]; then
         system="$1"
         shift
@@ -44,7 +44,7 @@ type: posix
 dir: ${path}
 EOF
     )
-    if ! echo "${data}" | storage_write_configuration ${system} "${name}.target.yml"; then
+    if ! datafile="$(echo "${data}" | storage_write_configuration ${system} "${name}.target.yml")"; then
         echo "failed to write ${name}.target.yml configuration"
         return 1
     fi
@@ -55,7 +55,7 @@ if [ "${cw_POSIX_path:0:1}" == "%" ]; then
 fi
 EOF
     )
-    if ! echo -e "cw_POSIX_path=\"${path}\"\n${data}" | storage_write_configuration ${system} "${name}.posix.rc"; then
+    if ! datafile="$(echo -e "cw_POSIX_path=\"${path}\"\n${data}" | storage_write_configuration ${system} "${name}.posix.rc")"; then
         echo "failed to write ${name}.posix.rc configuration"
         return 1
     fi
@@ -216,4 +216,9 @@ posix_storage_mkbucket() {
     else
         echo "created bucket ${name}:${target}"
     fi
+}
+
+posix_storage_addbucket() {
+    echo "external buckets not supported by 'posix' backend"
+    return 1
 }
