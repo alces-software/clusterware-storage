@@ -97,6 +97,10 @@ s3_storage_list() {
 
 s3_storage_get() {
     local args
+    if [ -z "$3" ]; then
+        echo "you must supply a destination"
+        return 1
+    fi
     if [[ "$2" != "s3://"* ]]; then
         args=("$1" "s3://${2}" "$3")
     else
