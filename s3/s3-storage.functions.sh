@@ -20,7 +20,7 @@
 # https://github.com/alces-software/clusterware
 #==============================================================================
 s3_storage_configure() {
-    local name access_key secret_key system
+    local name access_key secret_key system data datafile
     if [ "$1" == "--system" ]; then
         system="$1"
         shift
@@ -54,9 +54,10 @@ type: s3
 access_key: ${access_key}
 secret_key: ${secret_key}
 address: ${address}
+buckets: []
 EOF
     )
-    if ! echo "${data}" | storage_write_configuration ${system} "${name}.target.yml"; then
+    if ! datafile="$(echo "${data}" | storage_write_configuration ${system} "${name}.target.yml")"; then
         echo "failed to write ${name}.target.yml configuration"
         return 1
     fi
@@ -70,8 +71,20 @@ use_https = True
 check_ssl_certificate = True
 EOF
     )
-    if ! echo "${data}" | storage_write_configuration ${system} "${name}.s3.cfg"; then
+    if [ "${address}" == "storage.googleapis.com" ]; then
+        data="${data}"$'\n'"signature_v2 = True"
+    fi
+    if ! datafile="$(echo "${data}" | storage_write_configuration ${system} "${name}.s3.cfg")"; then
         echo "failed to write ${name}.s3.cfg configuration"
+        return 1
+    fi
+    data=$(cat <<EOF
+cw_STORAGE_s3_config="${datafile}"
+cw_STORAGE_s3_buckets=()
+EOF
+    )
+    if ! datafile="$(echo "${data}" | storage_write_configuration ${system} "${name}.s3.rc")"; then
+        echo "failed to write ${name}.s3.rc configuration"
         return 1
     fi
 }
@@ -81,30 +94,42 @@ s3_storage_perform() {
     cmd="$1"
     name="$2"
     shift 2
-    "${cw_ROOT}"/opt/s3cmd/s3cmd -c "$(storage_get_configuration "${name}")" "${cmd}" "$@" 2>&1 | \
+    . "$(storage_get_configuration "${name}")"
+    "${cw_ROOT}"/opt/s3cmd/s3cmd -c "${cw_STORAGE_s3_config}" "${cmd}" "$@" 2>&1 | \
         grep -v 'python-magic'
 }
 
 s3_storage_list() {
-    local args
+    local args a
     if [[ ! -z "$2" && "$2" != "s3://"* ]]; then
         args=("$1" "s3://${2}")
     else
         args=("$1" "$2")
     fi
     s3_storage_perform "ls" "${args[@]}"
+    if [ -z "$2" ]; then
+        for a in "${cw_STORAGE_s3_buckets[@]}"; do
+            echo "        EXTERNAL  $a"
+        done
+    fi
 }
 
 s3_storage_get() {
-    local args
-    if [ -z "$3" ]; then
+    local args name
+    args=("$1")
+    shift
+    while [[ "$1" == "--"* ]]; do
+        args+=($1)
+        shift
+    done
+    if [ -z "$2" ]; then
         echo "you must supply a destination"
         return 1
     fi
-    if [[ "$2" != "s3://"* ]]; then
-        args=("$1" "s3://${2}" "$3")
+    if [[ "$1" != "s3://"* ]]; then
+        args+=("s3://${1}" "$2")
     else
-        args=("$1" "$2" "$3")
+        args+=("$1" "$2")
     fi
     s3_storage_perform "get" "${args[@]}"
 }
@@ -130,13 +155,22 @@ s3_storage_mkbucket() {
 }
 
 s3_storage_rmbucket() {
-    local args
+    local args bucket rcfile
     if [[ "$2" != "s3://"* ]]; then
         args=("$1" "s3://${2}")
     else
         args=("$1" "$2")
     fi
-    s3_storage_perform "rb" "${args[@]}"
+    rcfile="$(storage_get_configuration "${args[0]}")"
+    targetfile="$(dirname "${rcfile}")/${name}.target.yml"
+    bucket="${args[1]}"
+    if grep -q "^cw_STORAGE_s3_buckets=.*\"${bucket}\"" "${rcfile}"; then
+        sed -i "${rcfile}" -e "s,^\(cw_STORAGE_s3_buckets=(.*\) \"${bucket}\"\([^)]*\),\1\2,g"
+        sed -i "${targetfile}" -e "s,^\(buckets: \[.*\)\"${bucket}\"\([^]]*\),\1\2,g" -e "s/\[, /[/g"
+        echo "removed external bucket: ${bucket}"
+    else
+        s3_storage_perform "rb" "${args[@]}"
+    fi
 }
 
 s3_storage_rm() {
@@ -147,4 +181,26 @@ s3_storage_rm() {
         args=("$1" "$2")
     fi
     s3_storage_perform "del" "${args[@]}"
+}
+
+s3_storage_addbucket() {
+    local name bucket rcfile targetfile
+    name="$1"
+    bucket="$2"
+    if [ -z "${bucket}" ]; then
+        echo "you must supply a bucket name"
+        return 1
+    elif [[ "$bucket" != "s3://"* ]]; then
+        bucket="s3://${bucket}"
+    fi
+    rcfile="$(storage_get_configuration "${name}")"
+    targetfile="$(dirname "${rcfile}")/${name}.target.yml"
+    if grep -q "^cw_STORAGE_s3_buckets=.*\"${bucket}\"" "${rcfile}"; then
+        echo "external bucket already exists: ${bucket}"
+        return 1
+    else
+        sed -i "${rcfile}" -e "s,^\(cw_STORAGE_s3_buckets=([^)]*\),\1 \"${bucket}\",g"
+        sed -i "${targetfile}" -e "s|^\(buckets: \[[^]]*\)|\1, \"${bucket}\"|g" -e "s/\[, /[/g"
+        echo "added external bucket: ${bucket}"
+    fi
 }
