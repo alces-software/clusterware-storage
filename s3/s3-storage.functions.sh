@@ -49,11 +49,11 @@ s3_storage_configure() {
 
     data=$(cat <<EOF
 ---
-name: ${name}
+name: '${name}'
 type: s3
-access_key: ${access_key}
-secret_key: ${secret_key}
-address: ${address}
+access_key: '${access_key}'
+secret_key: '${secret_key}'
+address: '${address}'
 buckets: []
 EOF
     )

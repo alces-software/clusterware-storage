@@ -39,9 +39,9 @@ posix_storage_configure() {
 
     data=$(cat <<EOF
 ---
-name: ${name}
+name: '${name}'
 type: posix
-dir: ${path}
+dir: '${path}'
 EOF
     )
     if ! datafile="$(echo "${data}" | storage_write_configuration ${system} "${name}.target.yml")"; then
