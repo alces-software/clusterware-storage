@@ -1,0 +1,4 @@
+---
+install:
+  _: |
+    alces service install clusterware-dropbox-cli
