@@ -118,9 +118,13 @@ s3_storage_get() {
     local args name
     args=("$1")
     shift
-    while [[ "$1" == "--"* ]]; do
-        args+=($1)
-        shift
+    while [[ "$1" == "-"* ]]; do
+	if [ "$1" == "-R" -o "$1" == "-r" ]; then
+	    args+=(--recursive)
+	else
+            args+=($1)
+	fi
+	shift
     done
     if [ -z "$2" ]; then
         echo "you must supply a destination"
@@ -135,11 +139,19 @@ s3_storage_get() {
 }
 
 s3_storage_put() {
-    local args
-    if [[ "$3" != "s3://"* ]]; then
-        args=("$1" "$2" "s3://${3}")
+    local args name
+    args=("$1")
+    shift
+    while [[ "$1" == -* ]]; do
+	if [ "$1" == "-R" -o "$1" == "-r" ]; then
+	    args+=(--recursive)
+	fi
+	shift
+    done
+    if [[ "$2" != "s3://"* ]]; then
+        args+=("$1" "s3://${2}")
     else
-        args=("$1" "$2" "$3")
+        args+=("$1" "$2")
     fi
     s3_storage_perform "put" "${args[@]}"
 }
@@ -174,11 +186,39 @@ s3_storage_rmbucket() {
 }
 
 s3_storage_rm() {
-    local args
-    if [[ "$2" != "s3://"* ]]; then
-        args=("$1" "s3://${2}")
+    local args recursive force confirm
+    args=("$1")
+    shift
+    while [[ "$1" == -* ]]; do
+	if [ "$1" == "-R" -o "$1" == "-r" ]; then
+	    args+=(--recursive)
+	    recursive=true
+	fi
+	if [ "$1" == "-f" ]; then
+	    force=true
+	fi
+	if [ "$1" == "-Rf" -o "$1" == "-rf" -o "$1" == "-fr" -o "$1" == "-fR" ]; then
+	    force=true
+	    recursive=true
+	    args+=(--recursive)
+	fi
+	shift
+    done
+    if [[ "$1" != "s3://"* ]]; then
+        args+=("s3://${1}")
     else
-        args=("$1" "$2")
+        args+=("$1")
+    fi
+    if [ "$recursive" ]; then
+	if [ -z "$force" ]; then
+	    echo -n "$cw_BINNAME: recursively delete '$1'? " >/dev/stderr
+	    read -N1 confirm
+	    echo "" > /dev/stderr
+	    if [ "$confirm" != "y" -a "$confirm" != 'Y' ]; then
+		echo "delete from storage aborted"
+		return 2
+	    fi
+	fi
     fi
     s3_storage_perform "del" "${args[@]}"
 }
