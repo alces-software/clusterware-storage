@@ -128,11 +128,29 @@ dropbox_storage_list() {
 }
 
 dropbox_storage_get() {
-    dropbox_storage_perform "get" "$@"
+    local args
+    args=("$1")
+    shift
+    while [[ "$1" == -* ]]; do
+	if [ "$1" == "-R" -o "$1" == "-r" ]; then
+	    args+=(--recursive)
+	fi
+	shift
+    done
+    dropbox_storage_perform "get" "${args[@]}" "$@"
 }
 
 dropbox_storage_put() {
-    dropbox_storage_perform "put" "$@"
+    local args
+    args=("$1")
+    shift
+    while [[ "$1" == -* ]]; do
+	if [ "$1" == "-R" -o "$1" == "-r" ]; then
+	    args+=(--recursive)
+	fi
+	shift
+    done
+    dropbox_storage_perform "put" "${args[@]}" "$@"
 }
 
 dropbox_storage_mkbucket() {
@@ -144,7 +162,36 @@ dropbox_storage_rmbucket() {
 }
 
 dropbox_storage_rm() {
-    dropbox_storage_perform "rm" "$@"
+    local args confirm recursive force
+    args=("$1")
+    shift
+    while [[ "$1" == -* ]]; do
+	if [ "$1" == "-R" -o "$1" == "-r" ]; then
+	    args+=(--recursive)
+	    recursive=true
+	fi
+	if [ "$1" == "-f" ]; then
+	    force=true
+	fi
+	if [ "$1" == "-Rf" -o "$1" == "-rf" -o "$1" == "-fr" -o "$1" == "-fR" ]; then
+	    force=true
+	    recursive=true
+	    args+=(--recursive)
+	fi
+	shift
+    done
+    if [ "$recursive" ]; then
+	if [ -z "$force" ]; then
+	    echo -n "$cw_BINNAME: recursively delete '$1'? " >/dev/stderr
+	    read -N1 confirm
+	    echo "" > /dev/stderr
+	    if [ "$confirm" != "y" -a "$confirm" != 'Y' ]; then
+		echo "delete from storage aborted"
+		return 2
+	    fi
+	fi
+    fi    
+    dropbox_storage_perform "rm" "${args[@]}" "$@"
 }
 
 dropbox_storage_addbucket() {
