@@ -101,33 +101,52 @@ posix_storage_list() {
 }
 
 posix_storage_put() {
-    local name source target
+    local name source target recursive
     name="$1"
-    source="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
-    target="$(posix_storage_sanitize_target "${3:-$(basename "$source")}")"
+    shift
+    while [[ "$1" == -* ]]; do
+	if [ "$1" == "-R" -o "$1" == "-r" ]; then
+	    recursive=true
+	fi
+	shift
+    done
+    source="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+    target="$(posix_storage_sanitize_target "${2:-$(basename "$source")}")"
     . $(storage_get_configuration "${name}")
     (
         cd "${HOME}"
+	if [ "$recursive" ]; then
+	    cp_args="-pR"
+	else
+	    cp_args="-p"
+	fi
         mkdir -p "$(dirname "${cw_POSIX_path}"/"${target}")" 2>/dev/null &&
-          cp -p "${source}" "${cw_POSIX_path}"/"${target}"
+          cp $cp_args -- "${source}" "${cw_POSIX_path}"/"${target}"
     )
     if [ $? -gt 0 ]; then
         echo "put to storage failed"
         return 1
     else
-        echo "${2} -> ${name}:${target}"
+        echo "${1} -> ${name}:${target}"
     fi
 }
 
 posix_storage_get() {
-    local name source target targetdir target_is_dir
+    local name source target targetdir target_is_dir recursive
     name="$1"
-    source="$(posix_storage_sanitize_target "$2")"
-    if [ -d "$3" ]; then
-        targetdir="$3"
+    shift
+    while [[ "$1" == -* ]]; do
+	if [ "$1" == "-R" -o "$1" == "-r" ]; then
+	    recursive=true
+	fi
+	shift
+    done
+    source="$(posix_storage_sanitize_target "$1")"
+    if [ -d "$2" ]; then
+        targetdir="$2"
         target_is_dir=true
     else
-        targetdir="$(dirname "${3}")"
+        targetdir="$(dirname "${2}")"
     fi
     if [ ! -d "${targetdir}" ]; then
         echo "get from storage failed - no such target directory"
@@ -136,12 +155,17 @@ posix_storage_get() {
     if [ "$target_is_dir" ]; then
         target="$(cd "${targetdir}" && pwd)/$(basename "$source")"
     else
-        target="$(cd "${targetdir}" && pwd)/$(basename "${3:-$source}")"
+        target="$(cd "${targetdir}" && pwd)/$(basename "${2:-$source}")"
     fi
     . $(storage_get_configuration "${name}")
     (
         cd "${HOME}"
-        cp -p "${cw_POSIX_path}"/"${source}" "${target}"
+	if [ "$recursive" ]; then
+	    cp_args="-pR"
+	else
+	    cp_args="-p"
+	fi
+        cp $cp_args -- "${cw_POSIX_path}"/"${source}" "${target}"
     )
     if [ $? -gt 0 ]; then
         echo "get from storage failed"
@@ -152,13 +176,40 @@ posix_storage_get() {
 }
 
 posix_storage_rm() {
-    local name target
+    local name target recursive force ec
     name="$1"
-    target="$(posix_storage_sanitize_target "$2")"
+    shift
+    while [[ "$1" == -* ]]; do
+	if [ "$1" == "-R" -o "$1" == "-r" ]; then
+	    recursive=true
+	fi
+	if [ "$1" == "-f" ]; then
+	    force=true
+	fi
+	if [ "$1" == "-Rf" -o "$1" == "-rf" -o "$1" == "-fr" -o "$1" == "-fR" ]; then
+	    force=true
+	    recursive=true
+	fi
+	shift
+    done
+    target="$(posix_storage_sanitize_target "$1")"
     . $(storage_get_configuration "${name}")
     (
         cd "${HOME}"
-        if rm -f "${cw_POSIX_path}"/"${target}" 2>/dev/null; then
+	if [ "$recursive" ]; then
+	    if [ -z "$force" ]; then
+		echo -n "$cw_BINNAME: recursively delete '$target'? " >/dev/stderr
+		read -N1 confirm
+		echo "" > /dev/stderr
+		if [ "$confirm" != "y" -a "$confirm" != 'Y' ]; then
+		    exit 2
+		fi
+	    fi
+	    rm_args="-rf"
+	else
+	    rm_args="-f"
+	fi
+        if rm $rm_args -- "${cw_POSIX_path}"/"${target}" 2>/dev/null; then
             bucket="${target%%/*}"
             if [ -d "${cw_POSIX_path}"/"${bucket}" ]; then
                 cd "${cw_POSIX_path}"/"${bucket}"
@@ -168,7 +219,11 @@ posix_storage_rm() {
             exit 1
         fi
     )
-    if [ $? -gt 0 ]; then
+    ec=$?
+    if [ $ec == 2 ]; then
+        echo "delete from storage aborted"
+	return 1
+    elif [ $ec -gt 0 ]; then
         echo "delete from storage failed"
         return 1
     else
