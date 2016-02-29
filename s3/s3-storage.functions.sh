@@ -68,11 +68,15 @@ secret_key = ${secret_key}
 host_base = ${address}
 host_bucket = %(bucket)s.${address}
 use_https = True
-check_ssl_certificate = True
 EOF
     )
     if [ "${address}" == "storage.googleapis.com" ]; then
         data="${data}"$'\n'"signature_v2 = True"
+    fi
+    if [ "$("${cw_ROOT}"/opt/s3cmd/s3cmd --version | cut -d' ' -f3)" == "1.6.1" ]; then
+	data="${data}"$'\n'"check_ssl_certificate = True"
+    else
+	data="${data}"$'\n'"check_ssl_certificate = False"
     fi
     if ! datafile="$(echo "${data}" | storage_write_configuration ${system} "${name}.s3.cfg")"; then
         echo "failed to write ${name}.s3.cfg configuration"
