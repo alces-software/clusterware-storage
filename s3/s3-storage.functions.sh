@@ -99,8 +99,8 @@ s3_storage_perform() {
     name="$2"
     shift 2
     . "$(storage_get_configuration "${name}")"
-    "${cw_ROOT}"/opt/s3cmd/s3cmd -c "${cw_STORAGE_s3_config}" "${cmd}" "$@" 2>&1 | \
-        grep -v 'python-magic'
+    "${cw_ROOT}"/opt/s3cmd/s3cmd --progress -c "${cw_STORAGE_s3_config}" "${cmd}" "$@" 2>&1 | \
+        stdbuf -oL grep -v 'python-magic' | stdbuf -o0 sed 's/.*\(.*\)/\1/g'
 }
 
 s3_storage_list() {
