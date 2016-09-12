@@ -149,6 +149,8 @@ s3_storage_put() {
     while [[ "$1" == -* ]]; do
 	if [ "$1" == "-R" -o "$1" == "-r" ]; then
 	    args+=(--recursive)
+        else
+            args+=($1)
 	fi
 	shift
     done
@@ -194,14 +196,12 @@ s3_storage_rm() {
     args=("$1")
     shift
     while [[ "$1" == -* ]]; do
-	if [ "$1" == "-R" -o "$1" == "-r" ]; then
+	if [ "$1" == "-R" -o "$1" == "-r" -p "$1" == "--recursive" ]; then
 	    args+=(--recursive)
 	    recursive=true
-	fi
-	if [ "$1" == "-f" ]; then
+	elif [ "$1" == "-f" -o "--force" ]; then
 	    force=true
-	fi
-	if [ "$1" == "-Rf" -o "$1" == "-rf" -o "$1" == "-fr" -o "$1" == "-fR" ]; then
+        elif [ "$1" == "-Rf" -o "$1" == "-rf" -o "$1" == "-fr" -o "$1" == "-fR" ]; then
 	    force=true
 	    recursive=true
 	    args+=(--recursive)
