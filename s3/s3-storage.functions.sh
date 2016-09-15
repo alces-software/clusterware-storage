@@ -196,7 +196,7 @@ s3_storage_rm() {
     args=("$1")
     shift
     while [[ "$1" == -* ]]; do
-	if [ "$1" == "-R" -o "$1" == "-r" -p "$1" == "--recursive" ]; then
+	if [ "$1" == "-R" -o "$1" == "-r" -o "$1" == "--recursive" ]; then
 	    args+=(--recursive)
 	    recursive=true
 	elif [ "$1" == "-f" -o "--force" ]; then
