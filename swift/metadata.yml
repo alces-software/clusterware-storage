@@ -1,0 +1,10 @@
+---
+install:
+  el7: |
+    yum install -y -e0 python-setuptools
+  ubuntu1604: |
+    apt-get install -y python-setuptools
+  _: |
+    easy_install pip
+    pip install --upgrade setuptools
+    pip install python-swiftclient
