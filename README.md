@@ -10,7 +10,7 @@ You should use these providers in conjunction with Alces Clusterware.  Installat
 
 ### `s3`
 
-Access to S3-API compatbile object storage including Amazon S3, Google Cloud Storage and Swift.
+Access to S3-API compatbile object storage including Amazon S3, Google Cloud Storage and Ceph Object Gateway (RadosGW).
 
 ### `dropbox`
 
@@ -19,6 +19,14 @@ Access to Dropbox file hosting.
 ### `posix`
 
 Unified acccess to standard POSIX filesystems.
+
+### `swift`
+
+Access to OpenStack Object Storage, Swift acccess to standard POSIX filesystems.
+
+### `http`
+
+Read-only access to manifest-based HTTP file libraries.
 
 ## Contributing
 
