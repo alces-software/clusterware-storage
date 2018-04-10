@@ -1,4 +1,8 @@
 ---
 install:
   _: |
-    alces service install s3cmd
+    if [ -f "${cw_ROOT}"/libexec/actions/forge ]; then
+      alces forge install alces/s3cmd
+    else
+      alces service install s3cmd
+    fi
